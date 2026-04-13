@@ -379,8 +379,21 @@ namespace OpenKNX.Toolbox.Sign
         private static EtsVersion? checkEtsPath(string path, int ns)
         {
             if(!File.Exists(System.IO.Path.Combine(path, "Knx.Ets.Xml.ObjectModel.dll"))) return null;
-                string versionInfo = FileVersionInfo.GetVersionInfo(System.IO.Path.Combine(path, "Knx.Ets.Xml.ObjectModel.dll")).FileVersion?.Substring(0,3) ?? "0.0";
-            
+
+            string versionInfo = FileVersionInfo.GetVersionInfo(System.IO.Path.Combine(path, "Knx.Ets.Xml.ObjectModel.dll")).FileVersion ?? "";
+            if (versionInfo.Length >= 3)
+                versionInfo = versionInfo.Substring(0, 3);
+            else
+                versionInfo = "0.0";
+
+            if (versionInfo == "0.0")
+            {
+                string folderName = Path.GetFileName(path);
+                EtsVersion? byFolder = etsVersions.FirstOrDefault(v => folderName.StartsWith(v.Version + ".", StringComparison.Ordinal) || folderName == v.Version);
+                if (byFolder != null)
+                    versionInfo = byFolder.Version;
+            }
+
             EtsVersion? vers = etsVersions.FirstOrDefault(v => v.Version == versionInfo);
 
             if(vers == null) vers = etsVersions.First();
@@ -390,8 +403,17 @@ namespace OpenKNX.Toolbox.Sign
 
         public static string FindEtsPath(int namespaceVersion)
         {
-            if(Directory.Exists(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "bin", "CV"))) {
-                foreach(string path in Directory.GetDirectories(System.IO.Path.Combine(Directory.GetCurrentDirectory(), "CV")).Reverse()) {
+            string? envOverride = Environment.GetEnvironmentVariable("OPENKNX_ETS_PATH");
+            if (!string.IsNullOrEmpty(envOverride))
+            {
+                EtsVersion? ets = checkEtsPath(envOverride, namespaceVersion);
+                if (ets != null)
+                    return envOverride;
+            }
+
+            string localCvPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "CV");
+            if(Directory.Exists(localCvPath)) {
+                foreach(string path in Directory.GetDirectories(localCvPath).Reverse()) {
                     EtsVersion? ets = checkEtsPath(path, namespaceVersion);
                     if(ets != null) {
                         return path;
